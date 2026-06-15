@@ -1,0 +1,40 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { parseTrace } from '../src/parser.mjs';
+import { formatSummary, summarizeTrace } from '../src/summary.mjs';
+
+const sample = `
+{"timestamp":"2026-01-15T09:00:00.000Z","type":"message","message":"Start run"}
+{"timestamp":"2026-01-15T09:00:01.000Z","type":"tool_call","tool":"search_files"}
+{"timestamp":"2026-01-15T09:00:01.250Z","type":"tool_result","tool":"search_files","duration_ms":250}
+{"timestamp":"2026-01-15T09:00:02.000Z","type":"tool_call","tool":"terminal"}
+{"timestamp":"2026-01-15T09:00:03.000Z","type":"error","tool":"terminal","error":"Command timed out"}
+{"timestamp":"2026-01-15T09:00:04.000Z","type":"done","message":"Recovered with a narrower test command"}
+`;
+
+describe('summarizeTrace', () => {
+  it('counts tool calls, durations, errors, and milestones', () => {
+    const summary = summarizeTrace(parseTrace(sample));
+
+    assert.equal(summary.eventCount, 6);
+    assert.equal(summary.totalToolCalls, 2);
+    assert.equal(summary.completedToolCalls, 1);
+    assert.equal(summary.failedToolCalls, 1);
+    assert.equal(summary.totalDurationMs, 250);
+    assert.deepEqual(summary.tools.map((tool) => tool.name), ['search_files', 'terminal']);
+    assert.equal(summary.errors[0].message, 'Command timed out');
+    assert.equal(summary.milestones.length, 2);
+  });
+});
+
+describe('formatSummary', () => {
+  it('renders a readable Markdown report', () => {
+    const report = formatSummary(summarizeTrace(parseTrace(sample)), { title: 'Example Report' });
+
+    assert.match(report, /^# Example Report/);
+    assert.match(report, /Tool calls: 1\/2 completed/);
+    assert.match(report, /- search_files: 1 call\(s\), 1 result\(s\), 250ms/);
+    assert.match(report, /- 2026-01-15T09:00:03.000Z \(terminal\): Command timed out/);
+    assert.match(report, /Timeline highlights/);
+  });
+});
