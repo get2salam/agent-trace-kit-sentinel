@@ -14,6 +14,7 @@ Agent Trace Kit Sentinel parses lightweight JSON/NDJSON traces and produces a co
 - Normalizes timestamps, tool names, messages, and duration fields.
 - Summarizes completed vs. failed tool calls.
 - Aggregates observed tool runtime per tool.
+- Scores trace health with deterministic completion, error, and latency checks.
 - Formats a clean Markdown run report for humans.
 - Ships with deterministic `node:test` coverage and a GitHub Actions workflow.
 - Uses only Node.js built-ins: no runtime dependencies.
@@ -44,6 +45,16 @@ Run the CLI against your own local trace:
 
 ```bash
 node bin/agent-trace.mjs path/to/trace.ndjson
+```
+
+Use the evaluation API to gate agent traces in CI or review scripts:
+
+```js
+import { evaluateTraceHealth, formatTraceHealth, parseTrace, summarizeTrace } from 'agent-trace-kit-sentinel';
+
+const summary = summarizeTrace(parseTrace(rawTrace));
+const health = evaluateTraceHealth(summary, { latencyBudgetMs: 5000 });
+console.log(formatTraceHealth(health));
 ```
 
 ## Trace format

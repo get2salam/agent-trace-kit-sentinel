@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { evaluateTraceHealth, formatTraceHealth } from './evaluation.mjs';
 import { parseTrace } from './parser.mjs';
 import { formatSummary, summarizeTrace } from './summary.mjs';
 
@@ -9,4 +10,4 @@ export async function reportFromFile(path, options = {}) {
   return formatSummary(summary, options);
 }
 
-export { parseTrace, summarizeTrace, formatSummary };
+export { evaluateTraceHealth, formatTraceHealth, parseTrace, summarizeTrace, formatSummary };
