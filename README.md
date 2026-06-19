@@ -38,6 +38,7 @@ Requirements: Node.js 20 or newer.
 
 ```bash
 npm test
+npm run verify
 npm run demo
 ```
 
@@ -106,9 +107,10 @@ Observed tool time: 1.60s
 
 ```bash
 npm test
+npm run verify
 ```
 
-The test suite covers parser validation, NDJSON and JSON-array input, summary aggregation, error reporting, and Markdown formatting.
+The test suite covers parser validation, NDJSON and JSON-array input, summary aggregation, error reporting, and Markdown formatting. `npm run verify` is the CI entrypoint: it runs the unit tests and a CLI smoke test against `tests/fixtures/agent-run.ndjson` so local checks match GitHub Actions.
 
 ## License
 
