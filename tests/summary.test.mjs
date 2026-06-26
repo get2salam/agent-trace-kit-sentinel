@@ -25,6 +25,27 @@ describe('summarizeTrace', () => {
     assert.equal(summary.errors[0].message, 'Command timed out');
     assert.equal(summary.milestones.length, 2);
   });
+
+  it('does not mark orphan or duplicate tool results as completed calls', () => {
+    const noisyTrace = `
+{"timestamp":"2026-01-15T09:00:00.000Z","type":"tool_result","tool":"terminal","duration_ms":75}
+{"timestamp":"2026-01-15T09:00:01.000Z","type":"tool_call","tool":"terminal"}
+{"timestamp":"2026-01-15T09:00:02.000Z","type":"tool_result","tool":"terminal","duration_ms":125}
+{"timestamp":"2026-01-15T09:00:03.000Z","type":"tool_result","tool":"terminal","duration_ms":50}
+{"timestamp":"2026-01-15T09:00:04.000Z","type":"tool_call","tool":"read_file"}
+`;
+
+    const summary = summarizeTrace(parseTrace(noisyTrace));
+
+    assert.equal(summary.totalToolCalls, 2);
+    assert.equal(summary.completedToolCalls, 1);
+    assert.equal(summary.failedToolCalls, 1);
+    assert.equal(summary.totalDurationMs, 250);
+    assert.deepEqual(summary.tools, [
+      { name: 'read_file', calls: 1, results: 0, durationMs: 0 },
+      { name: 'terminal', calls: 1, results: 3, durationMs: 250 },
+    ]);
+  });
 });
 
 describe('formatSummary', () => {

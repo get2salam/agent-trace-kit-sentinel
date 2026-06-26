@@ -1,6 +1,7 @@
 export function summarizeTrace(events) {
   const sorted = [...events].sort((left, right) => left.timestamp.localeCompare(right.timestamp));
   const toolStats = new Map();
+  const pendingToolCalls = new Map();
   const errors = [];
   const milestones = [];
   let totalToolCalls = 0;
@@ -11,10 +12,15 @@ export function summarizeTrace(events) {
     if (event.type === 'tool_call' && event.tool) {
       totalToolCalls += 1;
       ensureTool(toolStats, event.tool).calls += 1;
+      pendingToolCalls.set(event.tool, (pendingToolCalls.get(event.tool) ?? 0) + 1);
     }
 
     if (event.type === 'tool_result' && event.tool) {
-      completedToolCalls += 1;
+      const pending = pendingToolCalls.get(event.tool) ?? 0;
+      if (pending > 0) {
+        completedToolCalls += 1;
+        pendingToolCalls.set(event.tool, pending - 1);
+      }
       const stat = ensureTool(toolStats, event.tool);
       stat.results += 1;
       if (typeof event.durationMs === 'number') {
