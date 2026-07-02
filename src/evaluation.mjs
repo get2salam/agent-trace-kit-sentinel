@@ -9,14 +9,21 @@ export function evaluateTraceHealth(summary, options = {}) {
   const errorCount = Array.isArray(summary.errors) ? summary.errors.length : 0;
   const totalDurationMs = Math.max(0, Number(summary.totalDurationMs ?? 0));
   const latencyBudgetMs = Math.max(1, Number(options.latencyBudgetMs ?? 5000));
+  const loopThreshold = Math.max(2, Number(options.loopThreshold ?? 3));
+  const stuckLoops = Array.isArray(summary.repeatedToolCalls)
+    ? summary.repeatedToolCalls.filter((group) => group.count >= loopThreshold)
+    : [];
 
   const completionRate = totalToolCalls === 0
     ? 1
     : Math.min(1, completedToolCalls / totalToolCalls);
   const latencyRate = Math.max(0, 1 - totalDurationMs / latencyBudgetMs);
-  const reliabilityBonus = failedToolCalls === 0 && errorCount === 0 ? 10 : 0;
+  const reliabilityBonus = failedToolCalls === 0 && errorCount === 0 && stuckLoops.length === 0 ? 10 : 0;
   const score = clampScore(
-    Math.round((completionRate * 70) + (latencyRate * 20) + reliabilityBonus - (errorCount * 8)),
+    Math.round(
+      (completionRate * 70) + (latencyRate * 20) + reliabilityBonus
+      - (errorCount * 8) - (stuckLoops.length * 15),
+    ),
   );
 
   return {
@@ -24,7 +31,7 @@ export function evaluateTraceHealth(summary, options = {}) {
     grade: gradeScore(score),
     completionRate,
     latencyBudgetMs,
-    flags: buildFlags({ failedToolCalls, errorCount, totalDurationMs, latencyBudgetMs }),
+    flags: buildFlags({ failedToolCalls, errorCount, totalDurationMs, latencyBudgetMs, stuckLoops }),
   };
 }
 
@@ -40,7 +47,7 @@ export function formatTraceHealth(evaluation) {
   ].join('\n');
 }
 
-function buildFlags({ failedToolCalls, errorCount, totalDurationMs, latencyBudgetMs }) {
+function buildFlags({ failedToolCalls, errorCount, totalDurationMs, latencyBudgetMs, stuckLoops }) {
   const flags = [];
   if (failedToolCalls > 0) {
     flags.push(`${failedToolCalls} failed tool call(s)`);
@@ -50,6 +57,9 @@ function buildFlags({ failedToolCalls, errorCount, totalDurationMs, latencyBudge
   }
   if (totalDurationMs > latencyBudgetMs) {
     flags.push(`tool time exceeded ${latencyBudgetMs}ms budget`);
+  }
+  for (const loop of stuckLoops ?? []) {
+    flags.push(`${loop.tool} repeated ${loop.count}x in a row (possible stuck loop)`);
   }
   return flags;
 }

@@ -38,6 +38,39 @@ describe('evaluateTraceHealth', () => {
     ]);
   });
 
+  it('penalizes and flags traces stuck retrying the same tool call', () => {
+    const loopingRun = `
+{"timestamp":"2026-01-15T09:00:00.000Z","type":"tool_call","tool":"terminal","input":{"command":"npm test"}}
+{"timestamp":"2026-01-15T09:00:00.100Z","type":"tool_result","tool":"terminal","duration_ms":100}
+{"timestamp":"2026-01-15T09:00:01.000Z","type":"tool_call","tool":"terminal","input":{"command":"npm test"}}
+{"timestamp":"2026-01-15T09:00:01.100Z","type":"tool_result","tool":"terminal","duration_ms":100}
+{"timestamp":"2026-01-15T09:00:02.000Z","type":"tool_call","tool":"terminal","input":{"command":"npm test"}}
+{"timestamp":"2026-01-15T09:00:02.100Z","type":"tool_result","tool":"terminal","duration_ms":100}
+`;
+
+    const health = evaluateTraceHealth(summarizeTrace(parseTrace(loopingRun)), { latencyBudgetMs: 1000 });
+
+    assert.deepEqual(health.flags, ['terminal repeated 3x in a row (possible stuck loop)']);
+    assert.equal(health.score, 69);
+    assert.equal(health.grade, 'investigate');
+  });
+
+  it('respects a custom loopThreshold when scoring repeated calls', () => {
+    const twoCallRun = `
+{"timestamp":"2026-01-15T09:00:00.000Z","type":"tool_call","tool":"terminal","input":{"command":"npm test"}}
+{"timestamp":"2026-01-15T09:00:00.100Z","type":"tool_result","tool":"terminal","duration_ms":100}
+{"timestamp":"2026-01-15T09:00:01.000Z","type":"tool_call","tool":"terminal","input":{"command":"npm test"}}
+{"timestamp":"2026-01-15T09:00:01.100Z","type":"tool_result","tool":"terminal","duration_ms":100}
+`;
+
+    const health = evaluateTraceHealth(summarizeTrace(parseTrace(twoCallRun)), {
+      latencyBudgetMs: 1000,
+      loopThreshold: 2,
+    });
+
+    assert.deepEqual(health.flags, ['terminal repeated 2x in a row (possible stuck loop)']);
+  });
+
   it('formats a compact health summary for reports and CI logs', () => {
     const health = evaluateTraceHealth(summarizeTrace(parseTrace(cleanRun)), { latencyBudgetMs: 1000 });
 

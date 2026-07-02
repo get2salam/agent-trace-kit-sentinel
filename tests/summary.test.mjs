@@ -46,6 +46,36 @@ describe('summarizeTrace', () => {
       { name: 'terminal', calls: 1, results: 3, durationMs: 250 },
     ]);
   });
+
+  it('detects back-to-back tool calls that repeat the same tool and input', () => {
+    const loopingTrace = `
+{"timestamp":"2026-01-15T09:00:00.000Z","type":"tool_call","tool":"search_files","input":{"query":"TODO"}}
+{"timestamp":"2026-01-15T09:00:00.100Z","type":"tool_result","tool":"search_files","duration_ms":100}
+{"timestamp":"2026-01-15T09:00:01.000Z","type":"tool_call","tool":"search_files","input":{"query":"TODO"}}
+{"timestamp":"2026-01-15T09:00:01.100Z","type":"tool_result","tool":"search_files","duration_ms":100}
+{"timestamp":"2026-01-15T09:00:02.000Z","type":"tool_call","tool":"search_files","input":{"query":"TODO"}}
+{"timestamp":"2026-01-15T09:00:02.100Z","type":"tool_result","tool":"search_files","duration_ms":100}
+{"timestamp":"2026-01-15T09:00:03.000Z","type":"tool_call","tool":"read_file","input":{"path":"README.md"}}
+`;
+
+    const summary = summarizeTrace(parseTrace(loopingTrace));
+
+    assert.deepEqual(summary.repeatedToolCalls, [
+      {
+        tool: 'search_files',
+        input: { query: 'TODO' },
+        count: 3,
+        firstTimestamp: '2026-01-15T09:00:00.000Z',
+        lastTimestamp: '2026-01-15T09:00:02.000Z',
+      },
+    ]);
+  });
+
+  it('does not flag distinct or non-consecutive tool calls as repeats', () => {
+    const summary = summarizeTrace(parseTrace(sample));
+
+    assert.deepEqual(summary.repeatedToolCalls, []);
+  });
 });
 
 describe('formatSummary', () => {

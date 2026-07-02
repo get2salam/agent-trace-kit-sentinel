@@ -59,7 +59,49 @@ export function summarizeTrace(events) {
       .sort((left, right) => right.calls - left.calls || left.name.localeCompare(right.name)),
     errors,
     milestones,
+    repeatedToolCalls: detectRepeatedToolCalls(sorted),
   };
+}
+
+/**
+ * Detect back-to-back tool_call events that share the same tool and input.
+ * Three or more identical consecutive calls usually means the agent is
+ * stuck retrying the same action instead of making progress.
+ */
+function detectRepeatedToolCalls(sortedEvents) {
+  const groups = [];
+  let current = null;
+
+  for (const event of sortedEvents) {
+    if (event.type !== 'tool_call' || !event.tool) {
+      continue;
+    }
+
+    const signature = `${event.tool}::${JSON.stringify(event.input ?? null)}`;
+    if (current && current.signature === signature) {
+      current.count += 1;
+      current.lastTimestamp = event.timestamp;
+      continue;
+    }
+
+    if (current && current.count >= 2) {
+      groups.push(current);
+    }
+    current = {
+      signature,
+      tool: event.tool,
+      input: event.input,
+      count: 1,
+      firstTimestamp: event.timestamp,
+      lastTimestamp: event.timestamp,
+    };
+  }
+
+  if (current && current.count >= 2) {
+    groups.push(current);
+  }
+
+  return groups.map(({ signature, ...group }) => group);
 }
 
 export function formatSummary(summary, options = {}) {

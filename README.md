@@ -14,7 +14,8 @@ Agent Trace Kit Sentinel parses lightweight JSON/NDJSON traces and produces a co
 - Normalizes timestamps, tool names, messages, and duration fields.
 - Summarizes completed vs. failed tool calls.
 - Aggregates observed tool runtime per tool.
-- Scores trace health with deterministic completion, error, and latency checks.
+- Detects stuck loops: back-to-back tool calls that repeat the same tool and input.
+- Scores trace health with deterministic completion, error, latency, and loop checks.
 - Formats a clean Markdown run report for humans.
 - Ships with deterministic `node:test` coverage and a GitHub Actions workflow.
 - Uses only Node.js built-ins: no runtime dependencies.
